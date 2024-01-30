@@ -1,5 +1,6 @@
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
+#pragma once
+#include <stdio.h>
+
 #define DEFAULT_PROJECT_NAME "UNKNOWN PROJECT"
 #define DEFAULT_BUILD_DIR "build"
 #define DEFAULT_COMPILER "gcc"
@@ -7,21 +8,13 @@
 #define DEFAULT_SOURCE "main.c"
 
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+
 #include<windows.h>
-#include <stdio.h>
 
-typedef struct LinkedList {
-    void *data;
-    struct LinkedList *next;
-} LinkedList;
 
-typedef struct Library {
-    char *lib_name;
-    char *lib_dir;
-    char *include;
-} Library;
-
-typedef struct CBuild {
+typedef struct{
     TCHAR *pwd;
     //relative to pwd
     TCHAR *build_dir;
@@ -30,17 +23,18 @@ typedef struct CBuild {
     TCHAR *project_name;
     TCHAR *exe_name;
     TCHAR *compiler;
-//    LinkedList *libs;
-//    LinkedList *includes;
-    LinkedList *librarys;
-    LinkedList *args;
+    TCHAR *libs;
+    TCHAR *lib_dirs;
+    TCHAR *include_paths;
 } CBuild;
 
 void init(CBuild *c);
 
 void add_source(CBuild *c, char *arg);
 
-void add_lib(CBuild *c, Library *arg);
+void add_lib(CBuild *c, char *arg);
+void add_lib_dir(CBuild *c, char *arg);
+void add_include_dir(CBuild *c, char *arg);
 
 void add_args(CBuild *c, char *arg);
 
@@ -61,7 +55,7 @@ char *generate_cmd(CBuild *c);
 
 int build(CBuild *c);
 
-void create_dir(TCHAR *dir);
+void create_dirs(CBuild *c);
 
 void set_pwd(CBuild *c) {
     DWORD pathSize = GetCurrentDirectory(0, NULL);
@@ -79,8 +73,9 @@ void init(CBuild *c) {
     c->project_name = NULL;
     c->exe_name = NULL;
     c->compiler = NULL;
-    c->librarys = NULL;
-    c->args = NULL;
+    c->libs = "";
+    c->lib_dirs = "";
+    c->include_paths = "";
     set_pwd(c);
 }
 
@@ -203,6 +198,7 @@ int build(CBuild *c) {
     printf("exe_name: %s\n", c->exe_name);
     create_dirs(c);
     TCHAR *command = generate_cmd(c);
+    printf("\n%s\n", command);
     run_command(command);
     return EXIT_SUCCESS;
 }
@@ -238,35 +234,39 @@ char *formatString(const char *format, ...) {
 
 char *generate_cmd(CBuild *c) {
     // <compiler> "<source>" -o "<build_dir>/<EXE_NAME>"
-
-    return formatString("%s \"%s\" -o \"%s\\%s\"", c->compiler, c->source, c->build_dir, c->exe_name);
+    return formatString("%s \"%s\" -o \"%s\\%s\" %s %s %s", c->compiler, c->source, c->build_dir, c->exe_name, c->libs, c->lib_dirs, c->include_paths);
 }
+
 
 void set_exe_name(CBuild *c, char *arg) {
     c->exe_name = arg;
 }
 
-Library *get_lib_obj(char *lib_name, char *lib_dir, char *include) {
-    Library *lib;
-    lib->lib_name = lib_name;
-    lib->lib_dir = lib_dir;
-    lib->include = include;
-    return lib;
+void add_lib(CBuild *c, char *arg) {
+    if(strcmp(c->libs, "") == 0){
+        c->libs = formatString("-l%s", arg);
+        return;
+    }
+    char *n = formatString("%s -l%s", c->libs, arg);
+    free(c->libs);
+    c->libs = n;
 }
-
-void add_lib(CBuild *c, Library *arg) {
-    LinkedList *list = (LinkedList *) malloc(sizeof(LinkedList));
-    list->data = arg;
-    list->next = c->librarys;
-    c->librarys = list;
+void add_lib_dir(CBuild *c, char *arg) {
+    if(strcmp(c->libs, "") == 0){
+        c->libs = formatString("-L%s", arg);
+        return;
+    }
+    char *n = formatString("%s -L%s", c->libs, arg);
+    free(c->libs);
+    c->libs = n;
 }
-
-void add_args(CBuild *c, char *arg) {
-    LinkedList *list = (LinkedList *) malloc(sizeof(LinkedList));
-    list->data = arg;
-    list->next = c->args;
-    c->args = list;
+void add_include_dir(CBuild *c, char *arg) {
+    if(strcmp(c->libs, "") == 0){
+        c->libs = formatString("-I%s", arg);
+        return;
+    }
+    char *n = formatString("%s -I%s", c->libs, arg);
+    free(c->libs);
+    c->libs = n;
 }
-
-
 #endif
